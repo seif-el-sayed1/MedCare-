@@ -43,12 +43,13 @@ model Admin {
   isVerified             Boolean   @default(false)
   isBlocked              Boolean   @default(false)
   isDeleted              Boolean   @default(false)
-  passwordChangeAt       DateTime?
+  passwordChangedAt      DateTime?
   passwordResetToken     String?
   passwordResetExpiresAt DateTime?
   verificationToken      String?
   verificationTokenExp   DateTime?
   token                  String?
+  tokenExpDate           DateTime?
 }
 
 model User {
