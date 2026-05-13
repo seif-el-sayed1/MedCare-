@@ -370,6 +370,25 @@ class UserController {
 
   });
 
+  //@desc  Log Out
+  //@route POST /user/auth/log-out
+  //@access Private
+  logOut = asyncHandler(async (req, res, next) => {
+    const user = req.user;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        notificationToken: null,
+        token: null,
+        tokenExpDate: null
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "User logged out successfully!"
+    });
+  });
 }
 
 module.exports = new UserController();
