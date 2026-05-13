@@ -189,6 +189,38 @@ class AdminAuthController{
     });
   })
 
+  // @desc    Forgot admin account password
+  // @route   POST /admin/auth/forgotPassword
+  // @access  Public
+  adminForgotPassword = asyncHandler(async(req, res, next) => {
+    const { email } = req.body;
+    const lang = req.headers.lang || "en"
+    // Check email
+    if (!email) return next(new ApiError(translate("Email address is required", lang), 400));
+
+    const admin = await prisma.admin.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        password: true,
+        isDeleted: true,
+        isBlocked: true,
+        isVerified: true
+      }
+    })
+
+    const token = await Auth.createPasswordResetToken(admin.id);
+    await EmailController.adminForgotPasswordEmail(token, email);
+
+    res.status(200).json({
+      success: true,
+      message: "Reset password email is sent to your email address"
+    });
+
+  })
 
 }
 
