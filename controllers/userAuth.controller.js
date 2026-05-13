@@ -154,6 +154,74 @@ class UserController {
     return this.login(user, loginType)(req, res, next);
   });
 
+  // @desc    Sign Up
+  // @route   POST /user/auth/register
+  // @access  Public
+  userRegister = async (req, res, next) => {
+    try {
+
+      console.log(" 🚀~ Req.body ~ in User register", req.body);
+
+      const { code, hashedCode } = await generateCode();
+
+      // create user
+      const user = await prisma.user.create({
+        data: {
+          firstName: req.body.firstName,
+          lastName: req.body.lastName,
+          gender: req.body.gender,
+          email: req.body.email,
+          phone: req.body.phone,
+          age: req.body.age,
+          profilePicture: req.body.image || req.body.profilePicture,
+          loginType: req.body.loginType,
+          notificationToken: req.body.notificationToken,
+          password: await Auth.hashPassword(req.body.password),
+          verificationCode: hashedCode,
+          verificationCodeExp: new Date(Date.now() + 10 * 60 * 1000)
+        }
+      })
+
+      const { email, loginType } = req.body;
+
+      // For non-email login types, mark as verified immediately
+      if (loginType && loginType !== "email") {
+
+        const verifiedUser = await prisma.user.update({
+          where: {
+            id: user.id
+          },
+          data: {
+            isVerified: true
+          }
+        });
+        const token = await Auth.generateToken(verifiedUser.id, verifiedUser.role);
+
+        res.status(200).json({
+          success: true,
+          message: "Account Created and verified successfully",
+          data: {
+            ...this.#getUsersData(verifiedUser, req.headers.lang),
+            ...token
+          }
+        });
+      } else if (email) {
+        // Send verification email only
+        await userVerificationEmail(code, email);
+
+        res.status(200).json({
+          success: true,
+          message: "Verification OTP is sent to your Email",
+          data: {
+            ...this.#getUsersData(user, req.headers.lang)
+          }
+        });
+      }
+    } catch (err) {
+      next(err);
+    }
+  };
+
 }
 
 module.exports = new UserController();
