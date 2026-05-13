@@ -222,6 +222,49 @@ class UserController {
     }
   };
 
+  // @desc    User account verification
+  // @route   POST /user/auth/verifyAccount
+  // @access  Public
+  userVerifyAccount = asyncHandler(async (req, res, next) => {
+    const lang = req.headers.lang || "en";
+
+    if (!req.body.code)
+      return next(new ApiError(translate("Verification OTP is required", lang), 400));
+
+    const hashedCode = crypto.createHash("sha256").update(req.body.code).digest("hex");
+
+    const user = await prisma.user.findUnique({ where: { email: req.body.email } });
+    if (!user || (!user.verificationCode && !user.verificationCodeExp))
+      return next(new ApiError(translate("Invalid request", lang), 400));
+
+    if (Date.now() >= Date.parse(user.verificationCodeExp))
+      return next(new ApiError(translate("Verification OTP is expired", lang), 401));
+
+    if (user.verificationCode !== hashedCode)
+      return next(new ApiError(translate("Invalid Verification OTP", lang), 401));
+
+    const updatedUser = await prisma.user.update({
+      where: { email: req.body.email },
+      data: {
+        isVerified: true,
+        verificationCode: null,
+        verificationCodeExp: null,
+        notificationToken: req.body.notificationToken
+      },
+    });
+
+    const token = await Auth.generateToken(updatedUser.id, updatedUser.role);
+
+    res.status(200).json({
+      success: true,
+      message: "Account verified successfully",
+      data: {
+        ...this.#getUsersData(updatedUser, lang),
+        ...token
+      }
+    });
+  });
+
 }
 
 module.exports = new UserController();
