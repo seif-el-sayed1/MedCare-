@@ -47,7 +47,31 @@ class DoctorController {
         })
     })
 
-   
+    //@desc get all doctors
+    //@route GET /doctors
+    //@access public
+    getAllDoctors = asyncHandler(async (req, res, next) => {
+
+        const apiFeatures = new ApiFeatures(prisma.doctor, req.query, "Doctor")
+            .search()
+            .filter()
+            .sort()
+            .paginate()
+            .cleanResponse();
+
+        const data = await apiFeatures.execute();
+
+        await apiFeatures.calculatePagination();
+
+        res.status(200).json({
+            success: true,
+            results: data.length,
+            pagination: apiFeatures.paginationResult,
+            data
+        });
+    });
+
+
 }
 
 module.exports = new DoctorController()
