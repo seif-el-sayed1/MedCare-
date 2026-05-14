@@ -71,6 +71,28 @@ class DoctorController {
         });
     });
 
+    //@desc get single doctor
+    //@route GET /doctors/:id
+    //@access public
+    getOneDoctor = asyncHandler(async (req, res, next) => {
+        const { id } = req.params;
+
+        const doctor = await prisma.doctor.findUnique({
+            where: { id },
+            include: {
+                workingHours: true,
+            }
+
+        });
+        if (!doctor) return next(new ApiError("Doctor not found", 404));
+
+        res.status(200).json({
+            success: true,
+            data: doctor
+        });
+    });
+
+
 
 }
 
