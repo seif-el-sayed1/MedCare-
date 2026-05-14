@@ -90,6 +90,44 @@ class DoctorValidator {
         next();
     });
 
+    validateUpdateDoctor = asyncHandler(async (req, res, next) => {
+        const schema = Joi.object({
+            firstName: Joi.string().min(2).max(32).optional().messages({
+                "string.min": "First Name must be at least 2 characters",
+                "string.max": "First Name must be at most 32 characters",
+            }),
+    
+            lastName: Joi.string().min(2).max(32).optional().messages({
+                "string.min": "Last Name must be at least 2 characters",
+                "string.max": "Last Name must be at most 32 characters",
+            }),
+    
+            email: Joi.string().email().optional().messages({
+                "string.email": "Invalid Email Address",
+            }),
+    
+            phone: Joi.string().custom(phoneNumberValidator).optional().messages({
+                "any.required": "Phone number is required",
+            }),
+    
+            specialization: Joi.string().valid(...SPECIALIZATION).optional().messages({
+                "any.only": `Specialization must be one of: ${SPECIALIZATION.join(", ")}`,
+            }),
+    
+            consultationPrice: Joi.number().min(0).optional().messages({
+                "any.required": "Consultation Price is required",
+            }),
+    
+            bio: Joi.string().max(1000).optional(),
+        
+            experienceYears: Joi.number().optional()
+        });
+        
+        joiErrorHandler(schema, req);
+        checkIfPhoneStartsWithPlus2(req);
+
+        next();
+    });
 }
 
 module.exports = new DoctorValidator();
