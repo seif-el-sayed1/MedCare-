@@ -92,6 +92,31 @@ class DoctorController {
         });
     });
 
+    //@desc update doctor
+    //@route PUT /doctors/:id
+    //@access private
+    updateDoctor = asyncHandler(async (req, res, next) => {
+        const { id } = req.params;
+
+        const existDoctor = await prisma.doctor.findUnique({
+            where: { id }
+        });
+        if (!existDoctor) return next(new ApiError("Doctor not found", 404));
+
+        const doctor = await prisma.doctor.update({
+            where: { id },
+            data: req.body,
+            include: {
+                workingHours: true,
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Doctor updated successfully",
+            data: doctor
+        });
+    });
 
 
 }
