@@ -31,13 +31,60 @@ enum Gender {
   FEMALE
 }
 
+enum Specialization {
+  INTERNAL_MEDICINE
+  PEDIATRICS
+  CARDIOLOGY
+  DERMATOLOGY
+  ORTHOPEDICS
+  NEUROLOGY
+  OPHTHALMOLOGY
+  ENT
+  DENTISTRY
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum LabTestType {
+  CBC
+  BLOOD_SUGAR
+  LIVER_FUNCTION
+  KIDNEY_FUNCTION
+  URINE_ANALYSIS
+  THYROID_FUNCTION
+}
+
+enum LabTestStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentTypes {
+  PARTIALLY_PAID
+  FULLY_PAID
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
 // Models
 model Admin {
   id                     String    @id @default(uuid())
-  role                   Role      @default(ADMIN)
   firstName              String
   lastName               String
   email                  String    @unique
+  role                   Role      @default(ADMIN)
   password               String
   isSuperAdmin           Boolean   @default(false)
   isVerified             Boolean   @default(false)
@@ -50,19 +97,23 @@ model Admin {
   verificationTokenExp   DateTime?
   token                  String?
   tokenExpDate           DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([firstName, lastName])
 }
 
 model User {
-  id                        String    @id @default(uuid())
-  lang                      Lang      @default(EN)
-  loginType                 LoginType @default(EMAIL)
+  id                        String        @id @default(uuid())
+  lang                      Lang          @default(EN)
+  loginType                 LoginType     @default(EMAIL)
   firstName                 String
   lastName                  String
-  profilePicture            String?   @default("")
-  role                      Role      @default(USER)
+  profilePicture            String?       @default("")
+  role                      Role          @default(USER)
   gender                    Gender
-  email                     String    @unique
-  phone                     String?   @unique
+  email                     String        @unique
+  phone                     String?       @unique
   age                       Int?
   // Password
   password                  String
@@ -76,18 +127,103 @@ model User {
   verificationCodeVerified  Boolean?
   passwordVerificationToken String?
   passwordResetExpiresAt    DateTime?
-  isVerified                Boolean   @default(false)
+  isVerified                Boolean       @default(false)
   // Active
   deactivatedAt             DateTime?
-  isActive                  Boolean   @default(true)
-  isBlocked                 Boolean   @default(false)
+  isActive                  Boolean       @default(true)
+  isBlocked                 Boolean       @default(false)
   // Auth
   token                     String?
   tokenExpDate              DateTime?
   notificationToken         String?
   // Timestamps
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  appointments              Appointment[]
+  payments                  Payment[]
 
   @@index([firstName, lastName])
+}
+
+model WorkingHours {
+  id           String  @id @default(uuid())
+  doctorId     String
+  doctor       Doctor  @relation(fields: [doctorId], references: [id])
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  slotDuration Int     @default(30)
+  isAvailable  Boolean @default(true)
+  weeksOfLeave Int     @default(0)
+
+  @@unique([doctorId, dayOfWeek])
+}
+
+model Doctor {
+  id                String         @id @default(uuid())
+  firstName         String
+  lastName          String
+  profilePicture    String?        @default("")
+  email             String         @unique
+  specialization    Specialization
+  phone             String         @unique
+  consultationPrice Float          @default(0)
+  bio               String?
+  experienceYears   Int            @default(0)
+  ratingsAverage    Float          @default(0)
+  ratingQuantity    Int            @default(0)
+  isDeleted         Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  workingHours      WorkingHours[]
+  // leaves            DoctorLeave[]
+  appointments      Appointment[]
+
+  @@index([firstName, lastName])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  appointmentId String
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  orderCode     String        @unique
+  amount        Float
+  billedAmount  Float
+  cardNum       String?
+  cardType      String?
+  currency      String?
+  success       Boolean?
+  pending       Boolean       @default(true)
+  status        PaymentStatus @default(PENDING)
+  clientSecret  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Appointment {
+  id                String            @id @default(uuid())
+  doctorId          String
+  userId            String
+  appointmentDate   DateTime
+  appointmentStatus AppointmentStatus @default(PENDING)
+  totalPrice        Float             @default(0)
+  paidAmount        Float             @default(0)
+  remainingAmount   Float             @default(0)
+  paymentType       PaymentTypes
+  isPaid            Boolean           @default(false)
+  appointmentCode   String?           @unique
+  hasConsultation   Boolean           @default(true) // NOTE: think of make endpoint after doctor consultation
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  doctor   Doctor    @relation(fields: [doctorId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  payments Payment[]
+
+  @@index([doctorId, appointmentDate])
+  @@index([userId, appointmentStatus])
+  @@index([appointmentDate])
 }
