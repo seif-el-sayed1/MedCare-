@@ -54,7 +54,23 @@ class Auth {
         const salt = await bcrypt.genSalt(10);
         return await bcrypt.hash(password, salt);
     };
-    
+
+    createPasswordResetToken = async (userId) => {
+
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+        // Save hashed reset token with expiry (10 minutes)
+        await prisma.admin.update({
+            where: { id: userId },
+            data: {
+                passwordResetToken: hashedToken,
+                passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            },
+        });
+
+        return rawToken;
+    };
 }
 
 
