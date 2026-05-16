@@ -79,6 +79,38 @@ class WorkingHoursController {
         });
     });
 
+    //@desc delete working hours for doctor
+    //@route delete /doctors/:id/working-hours/:whId
+    //@access private
+    deleteWorkingHours = asyncHandler(async (req, res, next) => {
+        const { id, whId } = req.params;
+
+        // check working hours exists for this doctor
+        const existingWorkingHours = await prisma.workingHours.findFirst({
+            where: {
+                id: whId,
+                doctorId: id
+            }
+        });
+
+        if (!existingWorkingHours) {
+            return next(new ApiError("Working hours not found", 404));
+        }
+
+        // delete working hours
+        await prisma.workingHours.delete({
+            where: {
+                id: whId,
+                doctorId: id
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Working hours deleted successfully"
+        });
+    });
+
     
 }
 
