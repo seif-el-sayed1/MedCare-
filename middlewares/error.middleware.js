@@ -80,6 +80,16 @@ const handleValidationError = (err, lang) => {
   return new ApiError(`${invalidData}: ${shortMessage}`, 400);
 };
 
+const handleDriverAdapterError = (err, lang) => {
+  const message = err.message || "";
+
+  if (message.includes("violates RESTRICT setting") || message.includes("violates foreign key constraint")) {
+    return new ApiError(translate("Cannot delete this record because it has related data", lang), 400);
+  }
+
+  return new ApiError(translate("Something went wrong", lang), 500);
+};
+
 const handleInvalidJwtSignature = (lang) =>
   new ApiError(translate("Invalid token, Please login again ...", lang), 401);
 
@@ -99,6 +109,11 @@ const globalError = (err, req, res, next) => {
   if (err.name === "JsonWebTokenError") error = handleInvalidJwtSignature(lang);
   if (err.name === "TokenExpiredError") error = handleJwtExpired(lang);
 
+  // Driver Adapter Errors (RESTRICT, FK violations from pg driver)
+  if (err.name === "DriverAdapterError" || err.constructor?.name === "DriverAdapterError") {
+    error = handleDriverAdapterError(err, lang);
+  }
+
   // Prisma Errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") error = handleDuplicatedFieldsDB(err, lang);
@@ -113,7 +128,7 @@ const globalError = (err, req, res, next) => {
   if (err instanceof Prisma.PrismaClientValidationError) {
     error = handleValidationError(err, lang);
   }
-  
+
   error.message = translate(error.message, lang);
 
   if (process.env.NODE_ENV === "development") {
