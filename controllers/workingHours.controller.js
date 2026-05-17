@@ -3,6 +3,16 @@ const prisma = require("../startup/db");
 const ApiError = require("../utils/ApiError");
 const ApiFeatures = require("../utils/ApiFeatures");
 
+const dayNames = {
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday"
+}
+
 class WorkingHoursController {
 
     //@desc add working hours for doctor
@@ -10,32 +20,22 @@ class WorkingHoursController {
     //@access private
     addWorkingHours = asyncHandler(async (req, res, next) => {
         const { id } = req.params;
-        // Check doctor exists
-        const existingDoctor = await prisma.doctor.findUnique({
-            where: { id }
-        });
 
-        if (!existingDoctor) {
-            return next(new ApiError("Doctor not found", 404));
-        }
+        const doctor = await prisma.$transaction(async (tx) => {
+            const existingDoctor = await tx.doctor.findUnique({ where: { id } });
+            if (!existingDoctor) throw new ApiError("Doctor not found", 404);
 
-        // Add doctorId to every working hour
-        const workingHoursData = req.body.workingHours.map((item) => ({
-            ...item,
-            doctorId: id
-        }));
+            await tx.workingHours.createMany({
+                data: req.body.workingHours.map((item) => ({
+                    ...item,
+                    doctorId: id
+                }))
+            });
 
-        // Create working hours
-        await prisma.workingHours.createMany({
-            data: workingHoursData
-        });
-
-        // Get updated doctor with working hours
-        const doctor = await prisma.doctor.findUnique({
-            where: { id },
-            include: {
-                workingHours: true
-            }
+            return tx.doctor.findUnique({
+                where: { id },
+                include: { workingHours: true }
+            });
         });
 
         res.status(201).json({
@@ -46,17 +46,14 @@ class WorkingHoursController {
     });
 
     //@desc update working hours for doctor
-    //@route patch /doctors/:id/working-hours/:whId
+    //@route PATCH /doctors/:id/working-hours/:whId
     //@access private
     updateWorkingHours = asyncHandler(async (req, res, next) => {
         const { id, whId } = req.params;
 
         // check working hours exists for this doctor
         const existingWorkingHours = await prisma.workingHours.findFirst({
-            where: {
-                id: whId,
-                doctorId: id
-            }
+            where: { id: whId, doctorId: id }
         });
 
         if (!existingWorkingHours) {
@@ -65,10 +62,7 @@ class WorkingHoursController {
 
         // update working hours
         const updatedWorkingHours = await prisma.workingHours.update({
-            where: {
-                id: whId,
-                doctorId: id
-            },
+            where: { id: whId, doctorId: id },
             data: req.body
         });
 
@@ -80,17 +74,14 @@ class WorkingHoursController {
     });
 
     //@desc delete working hours for doctor
-    //@route delete /doctors/:id/working-hours/:whId
+    //@route DELETE /doctors/:id/working-hours/:whId
     //@access private
     deleteWorkingHours = asyncHandler(async (req, res, next) => {
         const { id, whId } = req.params;
 
         // check working hours exists for this doctor
         const existingWorkingHours = await prisma.workingHours.findFirst({
-            where: {
-                id: whId,
-                doctorId: id
-            }
+            where: { id: whId, doctorId: id }
         });
 
         if (!existingWorkingHours) {
@@ -99,10 +90,7 @@ class WorkingHoursController {
 
         // delete working hours
         await prisma.workingHours.delete({
-            where: {
-                id: whId,
-                doctorId: id
-            }
+            where: { id: whId, doctorId: id }
         });
 
         res.status(200).json({
@@ -115,72 +103,73 @@ class WorkingHoursController {
     //@route PATCH /doctors/:id/leaves
     //@access private
     addDoctorLeave = asyncHandler(async (req, res, next) => {
-        const { id } = req.params
-        const days = req.body
+        const { id } = req.params;
+        const days = req.body;
 
-        const doctor = await prisma.doctor.findUnique({ where: { id } })
-        if (!doctor) return next(new ApiError("Doctor not found", 404))
+        await prisma.$transaction(async (tx) => {
+            const doctor = await tx.doctor.findUnique({ where: { id } });
+            if (!doctor) throw new ApiError("Doctor not found", 404);
 
-        const today = new Date().getDay()
+            const today = new Date().getDay();
 
-        for (const { day, weeksOfLeave } of days) {
-            if (day < today) return next(new ApiError(`${dayNames[day]} has already passed`, 400))
+            for (const { day, weeksOfLeave } of days) {
+                if (day < today) throw new ApiError(`${dayNames[day]} has already passed`, 400);
 
-            const workingHours = await prisma.workingHours.findUnique({
-                where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } }
-            })
-            if (!workingHours) return next(new ApiError(`Doctor doesn't work on ${dayNames[day]}`, 400))
-            if (!workingHours.isAvailable) return next(new ApiError(`${dayNames[day]} already has a leave`, 400))
+                const workingHours = await tx.workingHours.findUnique({
+                    where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } }
+                });
 
-            await prisma.workingHours.update({
-                where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } },
-                data: { isAvailable: false, weeksOfLeave }
-            })
-        }
+                if (!workingHours) throw new ApiError(`Doctor doesn't work on ${dayNames[day]}`, 400);
+                if (!workingHours.isAvailable) throw new ApiError(`${dayNames[day]} already has a leave`, 400);
+
+                await tx.workingHours.update({
+                    where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } },
+                    data: { isAvailable: false, weeksOfLeave }
+                });
+            }
+        });
 
         res.status(200).json({
             success: true,
             message: "Doctor leave added successfully"
-        })
-    })
+        });
+    });
 
-    // @desc cancel doctor leave
-    // @route PATCH /doctors/:id/leaves-cancel
-    // @access private
+    //@desc cancel doctor leave
+    //@route PATCH /doctors/:id/leaves-cancel
+    //@access private
     editDoctorLeave = asyncHandler(async (req, res, next) => {
-        const { id } = req.params
-        const days = req.body 
+        const { id } = req.params;
+        const days = req.body;
 
-        const doctor = await prisma.doctor.findUnique({ where: { id } })
-        if (!doctor) return next(new ApiError("Doctor not found", 404))
+        await prisma.$transaction(async (tx) => {
+            const doctor = await tx.doctor.findUnique({ where: { id } });
+            if (!doctor) throw new ApiError("Doctor not found", 404);
 
-        for (const { day, weeksOfLeave } of days) {
-            const workingHours = await prisma.workingHours.findUnique({
-                where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } }
-            })
-            if (!workingHours) return next(new ApiError(`Doctor doesn't work on ${dayNames[day]}`, 400))
-            if (workingHours.isAvailable) return next(new ApiError(`${dayNames[day]} has no leave`, 400))
+            for (const { day, weeksOfLeave } of days) {
+                const workingHours = await tx.workingHours.findUnique({
+                    where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } }
+                });
 
-            await prisma.workingHours.update({
-                where: {
-                    doctorId_dayOfWeek: {
-                        doctorId: id,
-                        dayOfWeek: day
+                if (!workingHours) throw new ApiError(`Doctor doesn't work on ${dayNames[day]}`, 400);
+                if (workingHours.isAvailable) throw new ApiError(`${dayNames[day]} has no leave`, 400);
+
+                await tx.workingHours.update({
+                    where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } },
+                    data: {
+                        weeksOfLeave,
+                        isAvailable: weeksOfLeave === 0
                     }
-                },
-                data: {
-                    weeksOfLeave,
-                    isAvailable: weeksOfLeave === 0
-                }
-            })
-        }
+                });
+            }
+        });
 
         res.status(200).json({
             success: true,
             message: "Doctor leave updated successfully"
-        })
-    })
-    
+        });
+    });
+
 }
 
-module.exports = new WorkingHoursController()
+module.exports = new WorkingHoursController();
