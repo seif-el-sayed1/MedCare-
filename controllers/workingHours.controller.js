@@ -143,6 +143,43 @@ class WorkingHoursController {
             message: "Doctor leave added successfully"
         })
     })
+
+    // @desc cancel doctor leave
+    // @route PATCH /doctors/:id/leaves-cancel
+    // @access private
+    editDoctorLeave = asyncHandler(async (req, res, next) => {
+        const { id } = req.params
+        const days = req.body 
+
+        const doctor = await prisma.doctor.findUnique({ where: { id } })
+        if (!doctor) return next(new ApiError("Doctor not found", 404))
+
+        for (const { day, weeksOfLeave } of days) {
+            const workingHours = await prisma.workingHours.findUnique({
+                where: { doctorId_dayOfWeek: { doctorId: id, dayOfWeek: day } }
+            })
+            if (!workingHours) return next(new ApiError(`Doctor doesn't work on ${dayNames[day]}`, 400))
+            if (workingHours.isAvailable) return next(new ApiError(`${dayNames[day]} has no leave`, 400))
+
+            await prisma.workingHours.update({
+                where: {
+                    doctorId_dayOfWeek: {
+                        doctorId: id,
+                        dayOfWeek: day
+                    }
+                },
+                data: {
+                    weeksOfLeave,
+                    isAvailable: weeksOfLeave === 0
+                }
+            })
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Doctor leave updated successfully"
+        })
+    })
     
 }
 
