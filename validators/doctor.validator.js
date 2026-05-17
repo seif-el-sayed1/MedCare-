@@ -114,7 +114,7 @@ class DoctorValidator {
                 "any.only": `Specialization must be one of: ${SPECIALIZATION.join(", ")}`,
             }),
     
-            consultationPrice: Joi.number().min(0).optional().messages({
+            consultationPrice: Joi.number().min(0).required().messages({
                 "any.required": "Consultation Price is required",
             }),
     
@@ -128,6 +128,36 @@ class DoctorValidator {
 
         next();
     });
+
+    // 0 = Sunday | 1 = Monday | 2 = Tuesday | 3 = Wednesday | 4 = Thursday | 5 = Friday | 6 = Saturday
+    validateDoctorLeave = asyncHandler(async (req, res, next) => {
+        const schema = Joi.array().items(
+            Joi.object({
+                day: Joi.number().min(0).max(6).required().messages({
+                    "any.required": "Day is required",
+                    "number.min": "Day must be between 0 and 6",
+                    "number.max": "Day must be between 0 and 6",
+                }),
+                weeksOfLeave: Joi.number().min(1).required().messages({
+                    "any.required": "Weeks of leave is required",
+                    "number.min": "Weeks of leave must be at least 1",
+                })
+            })
+        ).min(1).required().messages({
+            "any.required": "Days are required",
+            "array.min": "At least one day is required"
+        });
+
+        joiErrorHandler(schema, req);
+
+        // check duplicate days
+        const days = req.body.map(item => item.day);
+        const hasDuplicates = days.length !== new Set(days).size;
+        if (hasDuplicates) return next(new ApiError("Duplicate days are not allowed", 400));
+
+        next();
+    });
+
 }
 
 module.exports = new DoctorValidator();
