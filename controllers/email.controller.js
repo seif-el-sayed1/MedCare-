@@ -24,6 +24,28 @@ class EmailController {
     });
   };
 
+  adminForgotPasswordEmail = async (token, emailAddress) => {
+    const forgotLink = process.env.ADMIN_FORGOT_PASS;
+    const loginLink = process.env.ADMIN_LOGIN;
+
+    const html = generateHTML({
+      emailTitle: "Reset your admin account password",
+      emailSubTitle: "Tap the button below to reset your account password.",
+      btnText: "Reset Password",
+      btnLink: forgotLink + token,
+      belowText: "You can login from here:",
+      belowLink: loginLink,
+      footerNote: `You are receiving this email because a request to reset the password for your ${process.env.APP_NAME} admin account has been initiated. If you did not initiate this action, please disregard this message.`
+    });
+    await sendEmail({
+      email: emailAddress,
+      subject: `${process.env.APP_NAME} reset admin account password`,
+      html: html
+    });
+  };
+
+
+
 }
 
 module.exports = new EmailController();
