@@ -153,6 +153,27 @@ class DoctorController {
         });
     });
 
+    //@desc get doctor working hours
+    //@route GET /doctors/:id/available-slots?date=YYYY-MM-DD
+    //@access public
+    getAvailableSlots = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { date } = req.query;
+
+        if (!date) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'date is required' 
+            });
+        }
+
+        const slots = await getAvailableSlots(id, new Date(date));
+
+        res.status(200).json({
+            success: true,
+            data: slots
+        });
+    });
 
 }
 
