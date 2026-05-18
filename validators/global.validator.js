@@ -32,6 +32,21 @@ class GlobalValidator {
     next();
   });
 
+  validateNewPassword = asyncHandler(async (req, res, next) => {
+    const schema = Joi.object({
+      password: Joi.string().min(8).required().messages({
+        "string.min": "Password must be at least 8 characters long",
+        "any.required": "Password is required"
+      }),
+      confirmPassword: Joi.string().valid(Joi.ref("password")).required().messages({
+        "any.only": "Confirm password must match password",
+        "any.required": "Confirm password is required"
+      })
+    });
+    joiErrorHandler(schema, req);
+    next();
+  });
+
 }
 
 module.exports = new GlobalValidator();
